@@ -1,12 +1,21 @@
 <?php
+session_start();
+
+if (!isset($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 
 require 'connection.php';
 
+// CORRECTION : Déclaration de la variable $page
 $page = $_GET['page'] ?? 'tresorerie';
 
-// Vu que ya pas de système d'utilisateur pour l'instant on force le truc avc l'id mais je vais changer ça après
-$stmt_user = $pdo->query("SELECT raison_sociale FROM client WHERE id_client = 1");
-$nom_utilisateur = $stmt_user->fetchColumn() ?: "Mode\nParisienne";
+$user_id = $_SESSION['user']['id'];
+$user_profil = $_SESSION['user']['profil'];
+$user_id_client = $_SESSION['user']['id_client'];
+
+$nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
 
 $tresoreries = [];
 $remises = [];
@@ -133,9 +142,9 @@ switch ($page) {
             </a>
         </nav>
 
-        <button class="back-btn">
+        <a href="logout.php" class="back-btn" style="text-decoration: none;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        </button>
+        </a>
     </aside>
 
     <main class="main-content">
