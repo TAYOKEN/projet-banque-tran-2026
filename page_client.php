@@ -8,7 +8,6 @@ if (!isset($_SESSION['user'])) {
 
 require 'connection.php';
 
-// CORRECTION : Déclaration de la variable $page
 $page = $_GET['page'] ?? 'tresorerie';
 
 $user_id = $_SESSION['user']['id'];
@@ -58,7 +57,6 @@ switch ($page) {
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #f4f5f7; color: #333; display: flex; height: 100vh; overflow-x: hidden; }
         
-        /* Sidebar */
         .sidebar { width: 100px; background-color: #161618; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px 0; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 10; }
         .user-profile { display: flex; flex-direction: column; align-items: center; margin-bottom: 40px; }
         .avatar { width: 60px; height: 60px; border-radius: 50%; border: 2px solid white; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; background-color: #7c3aed; }
@@ -69,12 +67,10 @@ switch ($page) {
         .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
         .back-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
-        /* Contenu Principal */
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; }
         h1 { font-size: 36px; font-weight: 500; letter-spacing: 2px; margin-bottom: 30px; color: #0f172a; }
         .dark-card { background-color: #242b3b; border-radius: 20px; color: white; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         
-        /* Filtres et Top Section */
         .top-section { display: flex; gap: 20px; margin-bottom: 20px; align-items: stretch; }
         .filter-card { display: flex; align-items: center; padding: 20px 30px; border-radius: 25px; flex-grow: 1; }
         .date-filters { display: flex; flex-direction: column; gap: 15px; padding-right: 30px; }
@@ -88,7 +84,6 @@ switch ($page) {
         .btn-search-purple { background-color: #7c3aed; color: white; border: none; border-radius: 20px; width: 110px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
         .btn-purple { background-color: #8b5cf6; color: white; border: none; border-radius: 12px; padding: 15px; cursor: pointer; text-decoration: none; display: inline-block; text-align: center; }
 
-        /* Tableaux */
         .results-section { margin-bottom: 20px; padding-top: 30px; }
         .results-header { font-size: 15px; margin-bottom: 25px; letter-spacing: 1px; font-weight: 500; display: flex; justify-content: space-between; }
         .data-table { width: 100%; border-collapse: collapse; text-align: center; }
@@ -97,7 +92,6 @@ switch ($page) {
         .data-table th:not(:first-child), .data-table td:not(:first-child) { border-left: 4px solid white; }
         .data-table td:not(:first-child) { border-left: none; }
         
-        /* Tableaux imbriqués (Remises) */
         .main-row td { cursor: pointer; }
         .main-row td:first-child { display: flex; align-items: center; justify-content: center; gap: 10px; border-left: none !important;}
         .expanded-content { background-color: #1f2533; padding: 15px 0 15px 40px; display: none; } 
@@ -106,7 +100,6 @@ switch ($page) {
         .nested-table th.icon-header { border-left: none; width: 40px; }
         .nested-table td { padding: 8px 0; font-size: 12px; font-family: monospace; color: #d1d5db; }
 
-        /* Graphiques (Impayés) */
         .chart-container { position: relative; height: 250px; margin-left: 40px; margin-right: 20px; border-left: 1px solid rgba(255, 255, 255, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.3); display: flex; align-items: flex-end; justify-content: space-around; padding: 0 40px; }
         .grid-line { position: absolute; left: -5px; right: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 1; }
         .y-label { position: absolute; left: -40px; font-size: 10px; color: #ccc; transform: translateY(-50%); }
@@ -114,7 +107,6 @@ switch ($page) {
         .bar { background-color: #8b5cf6; width: 100%; border-top-left-radius: 15px; border-top-right-radius: 15px; }
         .x-label { margin-top: 15px; font-size: 10px; color: #ccc; white-space: nowrap; position: absolute; bottom: -25px;}
 
-        /* Export Bar */
         .export-bar { display: flex; align-items: center; padding: 15px 30px; border-radius: 20px; }
         .export-title { margin-right: 40px; font-weight: 600; letter-spacing: 1px; font-size: 14px; }
         .radio-group { display: flex; gap: 30px; flex-grow: 1; }

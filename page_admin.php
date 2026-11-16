@@ -16,7 +16,6 @@ $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSIO
 $stmt_clients = $pdo->query("SELECT id_client, raison_sociale, siren FROM client ORDER BY raison_sociale ASC");
 $clients_list = $stmt_clients->fetchAll();
 
-// INITIALISATION DES VARIABLES POUR ÉVITER LES ERREURS PHP
 $success_msg = "";
 $error_msg = "";
 
@@ -29,14 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mdp1      = $_POST['mdp1'] ?? '';
     $mdp2      = $_POST['mdp2'] ?? '';
 
-    // Validation : un client DOIT être lié à une entreprise
     if ($profil === 'client' && is_null($id_client)) {
         $error_msg = "Veuillez sélectionner une entreprise pour ce compte Client.";
     } elseif ($mdp1 !== $mdp2) {
         $error_msg = "Les mots de passe ne correspondent pas.";
     } elseif (!empty($prenom) && !empty($nom) && !empty($login) && !empty($mdp1)) {
         
-        // On force id_client à NULL pour Admin et PO
         if ($profil !== 'client') {
             $id_client = NULL;
         }
@@ -62,11 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace Administrateur - Gestion des comptes</title>
     <style>
-        /* === STYLES GLOBAUX (Thème Admin / Vert Emeraude) === */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #f4f5f7; color: #333; display: flex; height: 100vh; overflow-x: hidden; }
         
-        /* Sidebar */
         .sidebar { width: 100px; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px 0; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 10; }
         .user-profile { display: flex; flex-direction: column; align-items: center; margin-bottom: 40px; }
         .avatar { width: 60px; height: 60px; border-radius: 50%; border: 2px solid white; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; background-color: #34D399; }
@@ -77,11 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
         .logout-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
-        /* Contenu principal */
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column;}
         h1 { font-size: 32px; font-weight: 500; letter-spacing: 2px; margin-bottom: 30px; color: #0f172a; }
         
-        /* Formulaire de création de compte */
         .form-card { background-color: #242b3b; border-radius: 25px; color: white; padding: 40px 60px; box-shadow: 0 15px 40px rgba(0,0,0,0.15); max-width: 900px; margin: 0 auto; width: 100%; }
         .form-header { text-align: center; margin-bottom: 40px; }
         .form-header h2 { font-size: 24px; font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
@@ -92,20 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-group label { font-size: 13px; font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
         .form-group input, .form-group select { background-color: #1a1f2b; border: none; border-radius: 10px; height: 45px; color: white; padding: 0 15px; font-size: 14px; width: 100%; outline: none; }
         
-        /* Select personnalisé */
         .form-select { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238fa0b5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; padding-right: 40px; }
         
         .submit-btn { background-color: #34D399; color: white; border: none; border-radius: 25px; padding: 12px 25px; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .alert-success { background: #10b981; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         .alert-error { background: #ef4444; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         
-        /* Cacher la sélection de l'entreprise par défaut */
         #bloc_entreprise { display: none; }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="user-profile">
             <div class="avatar">
@@ -115,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <nav class="nav-menu">
-            <!-- Icônes inactives pour l'Admin -->
             <div class="nav-item">
                 <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Trésorerie
             </div>
@@ -125,7 +114,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="nav-item">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><line x1="12" y1="15" x2="15" y2="18"/></svg>Impayés
             </div>
-            <!-- Seule section active -->
             <a href="#" class="nav-item active">
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Comptes
             </a>
@@ -136,7 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </a>
     </aside>
 
-    <!-- CONTENU PRINCIPAL -->
     <main class="main-content">
         <h1>Gestion des comptes</h1>
         
@@ -179,7 +166,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </select>
                     </div>
 
-                    <!-- Ce champ n'apparaît que si "Client" est sélectionné -->
                     <div class="form-group full-width" id="bloc_entreprise">
                         <label>Lier à l'entreprise (Obligatoire pour les clients)</label>
                         <select name="id_client" class="form-select">
@@ -226,7 +212,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     blocEntreprise.querySelector('select').removeAttribute('required');
                 }
             }
-            // Exécuter au chargement pour afficher le select entreprise car "CLIENT" est sélectionné par défaut
             toggleEntrepriseField();
         </script>
     </main>

@@ -8,7 +8,6 @@ if (!isset($_SESSION['user'])) {
 
 require 'connection.php';
 
-// CORRECTION: Define $page
 $page = $_GET['page'] ?? 'tresorerie';
 
 $user_id = $_SESSION['user']['id'];
@@ -17,7 +16,6 @@ $user_id_client = $_SESSION['user']['id_client'];
 
 $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
 
-// INITIALIZATION: Define message variables to prevent errors when not submitting the form
 $success_msg = "";
 $error_msg = "";
 
@@ -50,11 +48,10 @@ switch ($page) {
         break;
 
     case 'comptes':
-        // Traitement de l'insertion d'un nouveau compte PO
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $prenom = trim($_POST['prenom'] ?? '');
             $nom    = trim($_POST['nom'] ?? '');
-            $login  = trim($_POST['login'] ?? ''); // email pro
+            $login  = trim($_POST['login'] ?? ''); 
             $mdp1   = $_POST['mdp1'] ?? '';
             $mdp2   = $_POST['mdp2'] ?? '';
             $profil = 'product_owner';
@@ -85,11 +82,9 @@ switch ($page) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace Product Owner</title>
     <style>
-        /* === STYLES GLOBAUX FUSIONNÉS (Thème PO / Rose) === */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #f4f5f7; color: #333; display: flex; height: 100vh; overflow-x: hidden; }
         
-        /* Sidebar */
         .sidebar { width: 100px; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px 0; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 10; }
         .user-profile { display: flex; flex-direction: column; align-items: center; margin-bottom: 40px; }
         .avatar { width: 60px; height: 60px; border-radius: 50%; border: 2px solid white; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; background-color: #FF4785; }
@@ -100,12 +95,10 @@ switch ($page) {
         .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
         .logout-btn, .back-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
-        /* Contenu principal */
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column;}
         h1 { font-size: 32px; font-weight: 500; letter-spacing: 2px; margin-bottom: 30px; color: #0f172a; }
         .dark-card { background-color: #242b3b; border-radius: 20px; color: white; padding: 25px 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 
-        /* Top Section & Filtres */
         .top-section { display: flex; gap: 20px; margin-bottom: 20px; }
         .search-form { flex: 2; display: flex; flex-direction: column; gap: 15px; }
         .form-row { display: flex; align-items: center; }
@@ -117,7 +110,6 @@ switch ($page) {
         .info-box { background-color: #e5e7eb; color: #374151; padding: 15px; border-radius: 12px; font-size: 13px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
         .btn-pink { background-color: #FF4785; color: white; border: none; border-radius: 12px; padding: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-grow: 1; text-decoration: none;}
 
-        /* Tableaux de données */
         .results-section { margin-bottom: 20px; }
         .results-header { font-size: 14px; margin-bottom: 20px; letter-spacing: 1px; font-weight: 500; display: flex; justify-content: space-between; align-items: center;}
         .data-table { width: 100%; border-collapse: collapse; text-align: center; }
@@ -127,7 +119,6 @@ switch ($page) {
         .data-table td:not(:first-child) { border-left: none; }
         .data-table th:nth-child(2) { text-align: left; padding-left: 10px; }
 
-        /* Lignes extensibles (Remises) */
         .main-row td { cursor: pointer; }
         .main-row td:first-child { display: flex; align-items: center; justify-content: center; gap: 10px; border-left: none !important;}
         .expanded-content { background-color: #1f2533; padding: 15px 0 15px 40px; display: none; } 
@@ -136,7 +127,6 @@ switch ($page) {
         .nested-table th.icon-header { border-left: none; width: 40px; }
         .nested-table td { padding: 8px 0; font-size: 12px; font-family: monospace; color: #d1d5db; }
 
-        /* Formulaire de création de compte */
         .form-card { background-color: #242b3b; border-radius: 25px; color: white; padding: 40px 60px; box-shadow: 0 15px 40px rgba(0,0,0,0.15); max-width: 900px; margin: 0 auto; width: 100%; }
         .form-header { text-align: center; margin-bottom: 40px; }
         .form-header h2 { font-size: 24px; font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
@@ -150,7 +140,6 @@ switch ($page) {
         .alert-success { background: #10b981; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         .alert-error { background: #ef4444; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
 
-        /* Graphiques (Impayés) */
         .chart-container { position: relative; height: 250px; margin-left: 40px; margin-right: 20px; border-left: 1px solid rgba(255, 255, 255, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.3); display: flex; align-items: flex-end; justify-content: space-around; padding: 0 40px; }
         .grid-line { position: absolute; left: -5px; right: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 1; }
         .y-label { position: absolute; left: -40px; font-size: 10px; color: #ccc; transform: translateY(-50%); }
@@ -158,7 +147,6 @@ switch ($page) {
         .bar { background-color: #FF4785; width: 100%; border-top-left-radius: 15px; border-top-right-radius: 15px; }
         .x-label { margin-top: 15px; font-size: 10px; color: #ccc; white-space: nowrap; position: absolute; bottom: -25px;}
 
-        /* Export Bar */
         .export-bar { display: inline-flex; align-items: center; padding: 12px 25px; border-radius: 20px; gap: 30px; }
         .export-title { font-weight: 600; letter-spacing: 1px; font-size: 14px; }
         .radio-group { display: flex; gap: 25px; }
@@ -166,7 +154,6 @@ switch ($page) {
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="user-profile">
             <div class="avatar">
@@ -195,11 +182,9 @@ switch ($page) {
         </a>
     </aside>
 
-    <!-- CONTENU DYNAMIQUE -->
     <main class="main-content">
         
         <?php if ($page === 'tresorerie'): ?>
-            <!-- ================= VUE TRÉSORERIE ================= -->
             <h1>Annonces de Trésorerie</h1>
             <div class="top-section">
                 <div class="dark-card search-form">
@@ -244,7 +229,6 @@ switch ($page) {
             </div>
 
         <?php elseif ($page === 'remises'): ?>
-            <!-- ================= VUE REMISES ================= -->
             <h1>Remises</h1>
             <div class="top-section">
                 <div class="dark-card search-form">
@@ -329,7 +313,6 @@ switch ($page) {
             </div>
 
         <?php elseif ($page === 'impayes'): ?>
-            <!-- ================= VUE IMPAYÉS (TABLEAU) ================= -->
             <h1>Impayés</h1>
             <div class="top-section">
                 <div class="dark-card search-form">
@@ -412,7 +395,6 @@ switch ($page) {
             </div>
 
         <?php elseif ($page === 'comptes'): ?>
-            <!-- ================= VUE COMPTES ================= -->
             <h1>Gestion des comptes</h1>
             
             <?php if ($success_msg): ?>
@@ -474,7 +456,6 @@ switch ($page) {
             </div>
         <?php endif; ?>
 
-        <!-- BARRE D'EXPORT COMMUNE -->
         <?php if (in_array($page, ['tresorerie', 'remises', 'impayes'])): ?>
         <div class="dark-card export-bar" style="margin-top: 20px;">
             <div class="export-title">Exporter au format :</div>
