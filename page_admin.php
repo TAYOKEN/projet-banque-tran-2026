@@ -5,6 +5,10 @@ if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
 }
+if ($_SESSION['user']['profil'] !== 'admin') {
+    header('Location: ' . ($_SESSION['user']['profil'] === 'client' ? 'page_client.php' : 'page_po.php'));
+    exit;
+}
 
 require 'connection.php';
 
@@ -15,41 +19,76 @@ $user_id_client = $_SESSION['user']['id_client'];
 $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
 $stmt_clients = $pdo->query("SELECT id_client, raison_sociale, siren FROM client ORDER BY raison_sociale ASC");
 $clients_list = $stmt_clients->fetchAll();
+$csrfToken = $_SESSION['csrf_token'] ?? bin2hex(random_bytes(32));
+$_SESSION['csrf_token'] = $csrfToken;
 
 $success_msg = "";
 $error_msg = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $prenom    = trim($_POST['prenom'] ?? '');
-    $nom       = trim($_POST['nom'] ?? '');
-    $login     = trim($_POST['login'] ?? '');
-    $profil    = $_POST['profil'] ?? 'client';
-    $id_client = !empty($_POST['id_client']) ? $_POST['id_client'] : NULL;
-    $mdp1      = $_POST['mdp1'] ?? '';
-    $mdp2      = $_POST['mdp2'] ?? '';
-
-    if ($profil === 'client' && is_null($id_client)) {
-        $error_msg = "Veuillez sélectionner une entreprise pour ce compte Client.";
-    } elseif ($mdp1 !== $mdp2) {
-        $error_msg = "Les mots de passe ne correspondent pas.";
-    } elseif (!empty($prenom) && !empty($nom) && !empty($login) && !empty($mdp1)) {
-        
-        if ($profil !== 'client') {
-            $id_client = NULL;
-        }
-
-        try {
-            $hash = password_hash($mdp1, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO utilisateur (login, mdp, nom, prenom, profil, id_client) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$login, $hash, $nom, $prenom, $profil, $id_client]);
-            $success_msg = "Le compte " . strtoupper($profil) . " a été créé avec succès.";
-        } catch (PDOException $e) {
-            $error_msg = "Erreur lors de la création (ce login existe peut-être déjà).";
+    if (!hash_equals($csrfToken, $_POST['csrf_token'] ?? '')) {
+        $error_msg = "Le formulaire a expiré. Veuillez réessayer.";
+    } elseif (($_POST['action'] ?? '') === 'delete') {
+        $targetId = filter_var($_POST['user_id'] ?? null, FILTER_VALIDATE_INT);
+        if (($_POST['accord_po'] ?? '') !== '1') {
+            $error_msg = "L'accord du Product Owner est obligatoire pour supprimer un compte.";
+        } elseif ($targetId === false || $targetId === (int) $user_id) {
+            $error_msg = "Ce compte ne peut pas être supprimé.";
+        } else {
+            $stmt = $pdo->prepare('DELETE FROM utilisateur WHERE id_utilisateur = ?');
+            $stmt->execute([$targetId]);
+            if ($stmt->rowCount() === 0) {
+                $error_msg = "Le compte demandé n'existe plus.";
+            } else {
+                $success_msg = "Le compte a été supprimé.";
+            }
         }
     } else {
-        $error_msg = "Veuillez remplir tous les champs obligatoires.";
+        $prenom = trim($_POST['prenom'] ?? '');
+        $nom = trim($_POST['nom'] ?? '');
+        $login = trim($_POST['login'] ?? '');
+        $profil = $_POST['profil'] ?? '';
+        $id_client = filter_var($_POST['id_client'] ?? null, FILTER_VALIDATE_INT);
+        $mdp1 = $_POST['mdp1'] ?? '';
+        $mdp2 = $_POST['mdp2'] ?? '';
+
+        if (($_POST['accord_po'] ?? '') !== '1') {
+            $error_msg = "L'accord du Product Owner est obligatoire pour créer un compte.";
+        } elseif (!in_array($profil, ['admin', 'product_owner', 'client'], true)) {
+            $error_msg = "Le type de compte sélectionné est invalide.";
+        } elseif ($profil === 'client' && ($id_client === false || $id_client === null)) {
+            $error_msg = "Veuillez sélectionner une entreprise pour ce compte Client.";
+        } elseif ($mdp1 !== $mdp2) {
+            $error_msg = "Les mots de passe ne correspondent pas.";
+        } elseif ($prenom === '' || $nom === '' || $login === '' || $mdp1 === '') {
+            $error_msg = "Veuillez remplir tous les champs obligatoires.";
+        } else {
+            if ($profil !== 'client') {
+                $id_client = null;
+            } else {
+                $clientCheck = $pdo->prepare('SELECT COUNT(*) FROM client WHERE id_client = ?');
+                $clientCheck->execute([$id_client]);
+                if ((int) $clientCheck->fetchColumn() === 0) {
+                    $error_msg = "L'entreprise sélectionnée n'existe pas.";
+                }
+            }
+
+            if ($error_msg === '') {
+                try {
+                    $hash = password_hash($mdp1, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("INSERT INTO utilisateur (login, mdp, nom, prenom, profil, id_client) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$login, $hash, $nom, $prenom, $profil, $id_client]);
+                    $success_msg = "Le compte " . strtoupper($profil) . " a été créé avec succès.";
+                } catch (PDOException $e) {
+                    error_log('Account creation failed: ' . $e->getMessage());
+                    $error_msg = "Erreur lors de la création du compte. Vérifiez le login et réessayez.";
+                }
+            }
+        }
     }
 }
+$stmt_users = $pdo->query('SELECT id_utilisateur, login, nom, prenom, profil FROM utilisateur ORDER BY id_utilisateur ASC');
+$users_list = $stmt_users->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -90,6 +129,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .submit-btn { background-color: #34D399; color: white; border: none; border-radius: 25px; padding: 12px 25px; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .alert-success { background: #10b981; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         .alert-error { background: #ef4444; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .approval-row { grid-column: span 2; display: flex; align-items: center; gap: 10px; color: #fbbf24; font-size: 13px; }
+        .approval-row input, .approval-check input { width: auto; height: auto; accent-color: #34D399; }
+        .accounts-card { background: #fff; border-radius: 18px; padding: 28px; margin: 24px auto 0; width: min(1100px, 100%); box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+        .accounts-card h2 { color: #0f172a; font-size: 20px; margin-bottom: 18px; }
+        .accounts-table-wrap { overflow-x: auto; border: 1px solid #dbe2ea; border-radius: 12px; }
+        .accounts-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .accounts-table th { background: #eef2f7; color: #334155; padding: 12px; font-size: 12px; }
+        .accounts-table td { color: #334155; padding: 12px; border-top: 1px solid #e5e7eb; font-size: 13px; }
+        .accounts-table tr:nth-child(even) { background: #f8fafc; }
+        .delete-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .approval-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #475569; white-space: nowrap; }
+        .delete-btn { border: 0; border-radius: 7px; background: #dc2626; color: #fff; padding: 8px 10px; cursor: pointer; }
         
         #bloc_entreprise { display: none; }
     </style>
@@ -141,6 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="action" value="create">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Prénom</label>
@@ -187,6 +240,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label>Confirmer le mot de passe</label>
                         <input type="password" name="mdp2" required placeholder="********">
                     </div>
+
+                    <label class="approval-row">
+                        <input type="checkbox" name="accord_po" value="1" required>
+                        Demande de création validée par le Product Owner
+                    </label>
                 </div>
 
                 <div style="display:flex; justify-content: flex-end; align-items: center; gap: 20px;">
@@ -198,6 +256,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </form>
         </div>
+
+        <section class="accounts-card">
+            <h2>Comptes utilisateurs existants</h2>
+            <div class="accounts-table-wrap">
+                <table class="accounts-table">
+                    <thead><tr><th>Utilisateur</th><th>Nom</th><th>Rôle</th><th>Action</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($users_list as $account): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($account['login']) ?></td>
+                                <td><?= htmlspecialchars($account['prenom'] . ' ' . $account['nom']) ?></td>
+                                <td><?= htmlspecialchars(strtoupper(str_replace('_', ' ', $account['profil']))) ?></td>
+                                <td>
+                                    <?php if ((int) $account['id_utilisateur'] === (int) $user_id): ?>
+                                        Compte connecté
+                                    <?php else: ?>
+                                        <form method="POST" class="delete-form" onsubmit="return confirm('Confirmer la suppression de ce compte ?');">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="user_id" value="<?= (int) $account['id_utilisateur'] ?>">
+                                            <label class="approval-check"><input type="checkbox" name="accord_po" value="1" required> Accord PO</label>
+                                            <button type="submit" class="delete-btn">Supprimer</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <script>
             function toggleEntrepriseField() {

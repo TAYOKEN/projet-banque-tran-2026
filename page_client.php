@@ -5,10 +5,18 @@ if (!isset($_SESSION['user'])) {
     header('Location: login.php');
     exit;
 }
+if ($_SESSION['user']['profil'] !== 'client') {
+    header('Location: ' . ($_SESSION['user']['profil'] === 'product_owner' ? 'page_po.php' : 'page_admin.php'));
+    exit;
+}
 
 require 'connection.php';
+require 'report_data.php';
 
 $page = $_GET['page'] ?? 'tresorerie';
+if (!in_array($page, ['tresorerie', 'remises', 'impayes', 'impayes_graph'], true)) {
+    $page = 'tresorerie';
+}
 
 $user_id = $_SESSION['user']['id'];
 $user_profil = $_SESSION['user']['profil'];
@@ -16,34 +24,42 @@ $user_id_client = $_SESSION['user']['id_client'];
 
 $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
 
+$filters = $_GET;
+$reportPage = $page === 'impayes_graph' ? 'impayes' : $page;
 $tresoreries = [];
 $remises = [];
 $details_remises = [];
 $impayes = [];
+$reportTotal = 0;
+$reportPageNumber = 1;
+$reportPageSize = 10;
+$reportPageSizeInvalid = false;
+$reportTotalPages = 1;
+$impayesGraph = null;
 
-switch ($page) {
-    case 'tresorerie':
-        $stmt = $pdo->query("SELECT * FROM v_annonces_tresorerie");
-        $tresoreries = $stmt->fetchAll();
-        break;
-
-    case 'remises':
-        $stmt = $pdo->query("SELECT * FROM v_liste_remises");
-        $remises = $stmt->fetchAll();
-        
-        $stmt_det = $pdo->query("SELECT * FROM v_details_remises");
-        $raw_details = $stmt_det->fetchAll();
-        
-        foreach ($raw_details as $det) {
-            $details_remises[$det['num_remise']][] = $det;
+if (in_array($reportPage, ['tresorerie', 'remises', 'impayes'], true)) {
+    $reportData = fetchReportPage($pdo, $reportPage, $filters, (int) $user_id_client);
+    $reportRows = $reportData['rows'];
+    $reportTotal = $reportData['total'];
+    $reportPageNumber = $reportData['page'];
+    $reportPageSize = $reportData['page_size'];
+    $reportPageSizeInvalid = $reportData['page_size_invalid'];
+    $reportTotalPages = $reportData['total_pages'];
+    if ($reportPage === 'tresorerie') {
+        $tresoreries = $reportRows;
+    } elseif ($reportPage === 'remises') {
+        $remises = $reportRows;
+        if ($remises) {
+            foreach (fetchRemiseDetails($pdo, array_column($remises, 'id_remise')) as $det) {
+                $details_remises[$det['num_remise']][] = $det;
+            }
         }
-        break;
-
-    case 'impayes':
-    case 'impayes_graph':
-        $stmt = $pdo->query("SELECT * FROM v_recherche_impayes");
-        $impayes = $stmt->fetchAll();
-        break;
+    } else {
+        $impayes = $reportRows;
+    }
+}
+if ($page === 'impayes_graph') {
+    $impayesGraph = fetchImpayesGraphData($pdo, $filters, (int) $user_id_client);
 }
 ?>
 
@@ -84,21 +100,42 @@ switch ($page) {
         .btn-search-purple { background-color: #7c3aed; color: white; border: none; border-radius: 20px; width: 110px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
         .btn-purple { background-color: #8b5cf6; color: white; border: none; border-radius: 12px; padding: 15px; cursor: pointer; text-decoration: none; display: inline-block; text-align: center; }
 
-        .results-section { margin-bottom: 20px; padding-top: 30px; }
+        .results-section { margin-bottom: 20px; padding-top: 30px; background: #fff; color: #1f2937; }
         .results-header { font-size: 15px; margin-bottom: 25px; letter-spacing: 1px; font-weight: 500; display: flex; justify-content: space-between; }
-        .data-table { width: 100%; border-collapse: collapse; text-align: center; }
-        .data-table th { font-weight: 600; padding-bottom: 10px; font-size: 13px; border-bottom: 4px solid white; letter-spacing: 1px; }
-        .data-table td { padding: 12px 5px; font-size: 13px; font-family: monospace; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .data-table th:not(:first-child), .data-table td:not(:first-child) { border-left: 4px solid white; }
-        .data-table td:not(:first-child) { border-left: none; }
+        .table-scroll { overflow-x: auto; border: 1px solid #dbe2ea; border-radius: 12px; }
+        .data-table { width: 100%; min-width: 760px; border-collapse: collapse; text-align: left; }
+        .data-table th { background: #eef2f7; color: #334155; font-weight: 600; padding: 13px 15px; font-size: 12px; border-bottom: 1px solid #cbd5e1; letter-spacing: .3px; }
+        .data-table td { padding: 12px 15px; font-size: 13px; color: #334155; border-bottom: 1px solid #e5e7eb; }
+        .data-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .data-table tbody tr:hover { background: #f1f5f9; }
+        .data-table tbody tr:last-child td { border-bottom: 0; }
+        .filter-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; width: 100%; }
+        .filter-field { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+        .filter-field label { color: #cbd5e1; font-size: 12px; }
+        .form-input, .sort-select { width: 100%; min-width: 150px; height: 38px; padding: 0 10px; border: 1px solid #475569; border-radius: 8px; background: #1a1f2b; color: #fff; }
+        .sort-select { min-width: 170px; }
+        .filter-submit { min-height: 42px; padding: 0 18px; border: 0; border-radius: 8px; background: #7c3aed; color: white; font-weight: 600; cursor: pointer; }
+        .table-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -4px 0 18px; color: #64748b; font-size: 13px; }
+        .pagination-links { display: flex; align-items: center; gap: 8px; }
+        .pagination-link { color: #334155; text-decoration: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px; padding: 7px 12px; }
+        .pagination-link:hover { background: #eef2f7; }
+        .pagination-link.disabled { color: #94a3b8; pointer-events: none; }
+        .negative-amount { color: #dc2626 !important; font-weight: 700; }
+        .amount-band-low, .amount-band-medium, .amount-band-high, .amount-band-critical { display: inline-block; padding: 4px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+        .amount-band-low { color: #1d4ed8; background: #dbeafe; }
+        .amount-band-medium { color: #b45309; background: #fef3c7; }
+        .amount-band-high { color: #c2410c; background: #ffedd5; }
+        .amount-band-critical { color: #b91c1c; background: #fee2e2; }
+        .amount-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; font-size: 12px; color: #475569; }
+        .amount-legend span { padding: 5px 8px; border-radius: 6px; }
         
         .main-row td { cursor: pointer; }
         .main-row td:first-child { display: flex; align-items: center; justify-content: center; gap: 10px; border-left: none !important;}
         .expanded-content { background-color: #1f2533; padding: 15px 0 15px 40px; display: none; } 
-        .nested-table { width: 100%; border-collapse: collapse; text-align: center; }
-        .nested-table th { font-weight: 600; padding-bottom: 8px; font-size: 12px; border-bottom: 3px solid white; border-left: 4px solid white; }
-        .nested-table th.icon-header { border-left: none; width: 40px; }
-        .nested-table td { padding: 8px 0; font-size: 12px; font-family: monospace; color: #d1d5db; }
+        .nested-table { width: 100%; border-collapse: collapse; text-align: left; background: #fff; }
+        .nested-table th { background: #eef2f7; color: #334155; font-weight: 600; padding: 10px; font-size: 12px; border-bottom: 1px solid #cbd5e1; white-space: nowrap; }
+        .nested-table th.icon-header { width: 40px; }
+        .nested-table td { padding: 9px 10px; font-size: 12px; color: #334155; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
 
         .chart-container { position: relative; height: 250px; margin-left: 40px; margin-right: 20px; border-left: 1px solid rgba(255, 255, 255, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.3); display: flex; align-items: flex-end; justify-content: space-around; padding: 0 40px; }
         .grid-line { position: absolute; left: -5px; right: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 1; }
@@ -107,9 +144,12 @@ switch ($page) {
         .bar { background-color: #8b5cf6; width: 100%; border-top-left-radius: 15px; border-top-right-radius: 15px; }
         .x-label { margin-top: 15px; font-size: 10px; color: #ccc; white-space: nowrap; position: absolute; bottom: -25px;}
 
-        .export-bar { display: flex; align-items: center; padding: 15px 30px; border-radius: 20px; }
-        .export-title { margin-right: 40px; font-weight: 600; letter-spacing: 1px; font-size: 14px; }
-        .radio-group { display: flex; gap: 30px; flex-grow: 1; }
+        .export-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 16px 20px; border-radius: 14px; gap: 16px; }
+        .export-title { font-weight: 600; letter-spacing: .3px; font-size: 14px; }
+        .export-links { display: flex; gap: 10px; flex-wrap: wrap; }
+        .export-link { color: white; text-decoration: none; border: 1px solid #64748b; border-radius: 8px; padding: 9px 16px; font-size: 13px; transition: background .2s; }
+        .export-link:hover { background: #374151; }
+        .main-row td:first-child { display: table-cell; }
     </style>
 </head>
 <body>
@@ -143,18 +183,22 @@ switch ($page) {
         
         <?php if ($page === 'tresorerie'): ?>
             <h1>Vos Annonces de Trésorerie</h1>
-            <div class="top-section">
+            <form method="get" class="top-section">
+                <input type="hidden" name="page" value="tresorerie">
                 <div class="dark-card filter-card">
-                    <div class="form-label">Filtre Date :</div>
-                    <div class="date-selects">
-                        <select><option>Tous les mois</option></select>
+                    <div class="filter-controls">
+                        <div class="filter-field"><label for="date_valeur">Date de valeur</label><input id="date_valeur" type="date" name="date_valeur" class="form-input" value="<?= htmlspecialchars(reportInput($filters, 'date_valeur')) ?>"></div>
+                        <div class="filter-field"><label for="sort">Trier par</label><select id="sort" name="sort" class="sort-select"><?php foreach (reportSortOptions($reportPage) as $key => $label): ?><option value="<?= htmlspecialchars($key) ?>" <?= ($filters['sort'] ?? 'balance') === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="filter-field"><label for="direction">Ordre</label><select id="direction" name="direction" class="sort-select"><option value="asc" <?= ($filters['direction'] ?? 'asc') === 'asc' ? 'selected' : '' ?>>Croissant (0→9 / A→Z)</option><option value="desc" <?= ($filters['direction'] ?? '') === 'desc' ? 'selected' : '' ?>>Décroissant (9→0 / Z→A)</option></select></div>
+                        <div class="filter-field"><label for="page_size">Lignes par page</label><input id="page_size" type="number" min="1" step="1" required name="page_size" class="sort-select" inputmode="numeric" value="<?= $reportPageSize ?>"></div>
                     </div>
                 </div>
-                <button class="btn-search-purple"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-            </div>
+                <button type="submit" class="filter-submit">Appliquer</button>
+            </form>
 
             <div class="dark-card results-section">
-                <div class="results-header">État Actuel des Comptes</div>
+                <div class="results-header"><?= htmlspecialchars(treasuryBalanceLabel($filters) === 'Solde actuel' ? 'État Actuel des Comptes' : 'État des Comptes — ' . treasuryBalanceLabel($filters)) ?></div>
+                <div class="table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -162,7 +206,7 @@ switch ($page) {
                             <th>Raison Sociale</th>
                             <th>Transactions</th>
                             <th>Devise</th>
-                            <th>Solde Actuel</th>
+                            <th><?= htmlspecialchars(treasuryBalanceLabel($filters)) ?></th>
                             <th>Statut</th>
                         </tr>
                     </thead>
@@ -173,7 +217,7 @@ switch ($page) {
                             <td style="font-family: inherit;"><?= htmlspecialchars($row['raison_sociale']) ?></td>
                             <td><?= htmlspecialchars($row['nb_transactions'] ?? 0) ?></td>
                             <td>EUR</td>
-                            <td><?= number_format($row['montant_total_solde'], 2, ',', ' ') ?> €</td>
+                            <td class="<?= (float) $row['montant_total_solde'] < 0 ? 'negative-amount' : '' ?>"><?= number_format($row['montant_total_solde'], 2, ',', ' ') ?> €</td>
                             <td style="color: <?= $row['statut_visuel'] === 'ALERTE_ROUGE' ? '#ef4444' : '#10b981' ?>;">
                                 <?= htmlspecialchars($row['statut_visuel']) ?>
                             </td>
@@ -184,20 +228,29 @@ switch ($page) {
                         <?php endif; ?>
                     </tbody>
                 </table>
+                </div>
             </div>
 
         <?php elseif ($page === 'remises'): ?>
             <h1>Vos Remises</h1>
-            <div class="top-section">
+            <form method="get" class="top-section">
+                <input type="hidden" name="page" value="remises">
                 <div class="dark-card filter-card">
-                    <div class="form-label">Période :</div>
-                    <div class="date-selects"><select><option>Toutes</option></select></div>
+                    <div class="filter-controls">
+                        <div class="filter-field"><label for="date_debut">Du</label><input id="date_debut" type="date" name="date_debut" class="form-input" value="<?= htmlspecialchars($filters['date_debut'] ?? '') ?>"></div>
+                        <div class="filter-field"><label for="date_fin">Au</label><input id="date_fin" type="date" name="date_fin" class="form-input" value="<?= htmlspecialchars($filters['date_fin'] ?? '') ?>"></div>
+                        <div class="filter-field"><label for="remise">N° de remise</label><input id="remise" name="remise" class="form-input" value="<?= htmlspecialchars($filters['remise'] ?? '') ?>" placeholder="REM0000001"></div>
+                        <div class="filter-field"><label for="sort">Trier par</label><select id="sort" name="sort" class="sort-select"><?php foreach (reportSortOptions($reportPage) as $key => $label): ?><option value="<?= htmlspecialchars($key) ?>" <?= ($filters['sort'] ?? 'date') === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="filter-field"><label for="direction">Ordre</label><select id="direction" name="direction" class="sort-select"><option value="asc" <?= ($filters['direction'] ?? 'asc') === 'asc' ? 'selected' : '' ?>>Croissant (0→9 / A→Z)</option><option value="desc" <?= ($filters['direction'] ?? '') === 'desc' ? 'selected' : '' ?>>Décroissant (9→0 / Z→A)</option></select></div>
+                        <div class="filter-field"><label for="page_size">Lignes par page</label><input id="page_size" type="number" min="1" step="1" required name="page_size" class="sort-select" inputmode="numeric" value="<?= $reportPageSize ?>"></div>
+                    </div>
                 </div>
-                <button class="btn-search-purple"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-            </div>
+                <button type="submit" class="filter-submit">Appliquer</button>
+            </form>
 
             <div class="dark-card results-section">
-                <div class="results-header">Historique des Remises</div>
+                <div class="results-header">Historique des Remises — <?= $reportTotal ?> résultat(s)</div>
+                <div class="table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -218,7 +271,7 @@ switch ($page) {
                             <td><?= htmlspecialchars($row['num_remise']) ?></td>
                             <td><?= htmlspecialchars($row['date_traitement']) ?></td>
                             <td><?= htmlspecialchars($row['nb_transactions']) ?></td>
-                            <td><?= number_format($row['montant_total'], 2, ',', ' ') ?> €</td>
+                            <td class="<?= (float) $row['montant_total'] < 0 ? 'negative-amount' : '' ?>"><?= number_format($row['montant_total'], 2, ',', ' ') ?> €</td>
                             <td><?= htmlspecialchars($row['sens'] === '+' ? 'Crédit' : 'Débit') ?></td>
                         </tr>
                         <tr>
@@ -247,7 +300,7 @@ switch ($page) {
                                                     <td><?= htmlspecialchars($det['num_carte_masquee']) ?></td>
                                                     <td><?= htmlspecialchars($det['reseau']) ?></td>
                                                     <td><?= htmlspecialchars($det['num_autorisation']) ?></td>
-                                                    <td><?= number_format($det['montant'], 2, ',', ' ') ?> €</td>
+                                                    <td class="<?= (float) $det['montant'] < 0 ? 'negative-amount' : '' ?>"><?= number_format($det['montant'], 2, ',', ' ') ?> €</td>
                                                     <td><?= htmlspecialchars($det['sens'] === '+' ? 'Crédit' : 'Débit') ?></td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -258,28 +311,41 @@ switch ($page) {
                             </td>
                         </tr>
                         <?php endforeach; ?>
+                                        <?php if (empty($remises)): ?><tr><td colspan="7">Aucune remise trouvée.</td></tr><?php endif; ?>
                     </tbody>
                 </table>
+                </div>
             </div>
 
         <?php elseif ($page === 'impayes'): ?>
             <h1>Vos Impayés</h1>
-            <div class="top-section">
+            <form method="get" class="top-section">
+                <input type="hidden" name="page" value="impayes">
                 <div class="dark-card filter-card">
-                    <div class="dossier-filter">
-                        <div class="form-label">N° de dossier :</div>
-                        <input type="text" class="dossier-input" placeholder="DOS01...">
+                    <div class="filter-controls">
+                        <div class="filter-field"><label for="dossier">N° de dossier</label><input id="dossier" type="text" name="dossier" class="form-input" value="<?= htmlspecialchars($filters['dossier'] ?? '') ?>" placeholder="DOS01"></div>
+                        <div class="filter-field"><label for="date_debut">Du</label><input id="date_debut" type="date" name="date_debut" class="form-input" value="<?= htmlspecialchars($filters['date_debut'] ?? '') ?>"></div>
+                        <div class="filter-field"><label for="date_fin">Au</label><input id="date_fin" type="date" name="date_fin" class="form-input" value="<?= htmlspecialchars($filters['date_fin'] ?? '') ?>"></div>
+                        <div class="filter-field"><label for="sort">Trier par</label><select id="sort" name="sort" class="sort-select"><?php foreach (reportSortOptions($reportPage) as $key => $label): ?><option value="<?= htmlspecialchars($key) ?>" <?= ($filters['sort'] ?? 'amount') === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?></select></div>
+                        <div class="filter-field"><label for="direction">Ordre</label><select id="direction" name="direction" class="sort-select"><option value="asc" <?= ($filters['direction'] ?? '') === 'asc' ? 'selected' : '' ?>>Croissant (0→9 / A→Z)</option><option value="desc" <?= ($filters['direction'] ?? 'desc') === 'desc' ? 'selected' : '' ?>>Décroissant (9→0 / Z→A)</option></select></div>
+                        <div class="filter-field"><label for="page_size">Lignes par page</label><input id="page_size" type="number" min="1" step="1" required name="page_size" class="sort-select" inputmode="numeric" value="<?= $reportPageSize ?>"></div>
                     </div>
                 </div>
-                <button class="btn-search-purple"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-            </div>
+                <button type="submit" class="filter-submit">Appliquer</button>
+            </form>
 
             <div class="dark-card results-section">
                 <div class="results-header">
                     <span>Liste des dossiers impayés</span>
                     <a href="?page=impayes_graph" class="btn-purple" style="padding: 5px 15px; font-size:12px;">Voir les graphiques</a>
                 </div>
-                <table class="data-table">
+                <div class="amount-legend">
+                    <span class="amount-band-low">Moins de 100 €</span>
+                    <span class="amount-band-medium">100 à 199,99 €</span>
+                    <span class="amount-band-high">200 à 299,99 €</span>
+                    <span class="amount-band-critical">300 € et plus</span>
+                </div>
+                <div class="table-scroll"><table class="data-table">
                     <thead>
                         <tr>
                             <th>N° SIREN</th>
@@ -301,49 +367,62 @@ switch ($page) {
                             <td><?= htmlspecialchars($row['num_carte_masquee']) ?></td>
                             <td><?= htmlspecialchars($row['reseau']) ?></td>
                             <td><?= htmlspecialchars($row['num_dossier_impaye']) ?></td>
-                            <td><?= number_format($row['montant_impaye'], 2, ',', ' ') ?> €</td>
+                            <td><span class="<?= impayeAmountBand((float) $row['montant_impaye']) ?>"><?= number_format($row['montant_impaye'], 2, ',', ' ') ?> €</span></td>
                             <td style="font-family: inherit;"><?= htmlspecialchars($row['libelle_impaye']) ?></td>
                         </tr>
                         <?php endforeach; ?>
+                        <?php if (empty($impayes)): ?><tr><td colspan="8">Aucun impayé trouvé.</td></tr><?php endif; ?>
                     </tbody>
                 </table>
+                </div>
             </div>
 
         <?php elseif ($page === 'impayes_graph'): ?>
-            <h1>Impayés - Graphique</h1>
-            <div class="top-section">
-                <div class="dark-card filter-card">
-                    <div class="form-label">Filtre Rapide :</div>
-                    <div class="date-selects"><select><option>4 derniers mois</option></select></div>
-                </div>
-                <a href="?page=impayes" class="btn-purple" style="display:flex; align-items:center;">Retour au Tableau</a>
-            </div>
+            <?php include 'impayes_graph_view.php'; ?>
+        <?php endif; ?>
 
-            <div class="dark-card results-section">
-                <div class="results-header">Évolution des Impayés</div>
-                <div class="chart-container">
-                    <div class="grid-line" style="bottom: 80%;"><span class="y-label">4 000</span></div>
-                    <div class="grid-line" style="bottom: 60%;"><span class="y-label">3 000</span></div>
-                    <div class="grid-line" style="bottom: 40%;"><span class="y-label">2 000</span></div>
-                    <div class="grid-line" style="bottom: 20%;"><span class="y-label">1 000</span></div>
-
-                    <div class="bar-group"><div class="bar" style="height: 75%;"></div><div class="x-label">Septembre</div></div>
-                    <div class="bar-group"><div class="bar" style="height: 48%;"></div><div class="x-label">Octobre</div></div>
-                    <div class="bar-group"><div class="bar" style="height: 25%;"></div><div class="x-label">Novembre</div></div>
-                    <div class="bar-group"><div class="bar" style="height: 90%;"></div><div class="x-label">Décembre</div></div>
+        <?php if (in_array($page, ['tresorerie', 'remises', 'impayes'], true)): ?>
+            <?php $firstResult = $reportTotal === 0 ? 0 : (($reportPageNumber - 1) * $reportPageSize + 1); ?>
+            <?php $lastResult = min($reportTotal, $reportPageNumber * $reportPageSize); ?>
+            <div class="table-pagination">
+                <span>Affichage de <?= $firstResult ?> à <?= $lastResult ?> sur <?= $reportTotal ?> résultat(s)</span>
+                <?php if ($reportPageSizeInvalid): ?><span role="alert">Nombre de lignes invalide : 10 lignes par page ont été appliquées.</span><?php endif; ?>
+                <div class="pagination-links">
+                    <?php if ($reportPageNumber > 1): ?>
+                        <a class="pagination-link" href="?<?= htmlspecialchars(http_build_query(array_merge($filters, ['page' => $page, 'page_num' => $reportPageNumber - 1, 'page_size' => $reportPageSize])), ENT_QUOTES, 'UTF-8') ?>">Précédent</a>
+                    <?php else: ?>
+                        <span class="pagination-link disabled">Précédent</span>
+                    <?php endif; ?>
+                    <span>Page <?= $reportPageNumber ?> / <?= $reportTotalPages ?></span>
+                    <?php if ($reportPageNumber < $reportTotalPages): ?>
+                        <a class="pagination-link" href="?<?= htmlspecialchars(http_build_query(array_merge($filters, ['page' => $page, 'page_num' => $reportPageNumber + 1, 'page_size' => $reportPageSize])), ENT_QUOTES, 'UTF-8') ?>">Suivant</a>
+                    <?php else: ?>
+                        <span class="pagination-link disabled">Suivant</span>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
 
+        <?php if (in_array($page, ['tresorerie', 'remises', 'impayes'], true)): ?>
         <div class="dark-card export-bar">
-            <div class="export-title">Exporter au format :</div>
-            <div class="radio-group">
-                <label><input type="radio" name="format"> XLS</label>
-                <label><input type="radio" name="format"> CSV</label>
-                <label><input type="radio" name="format"> PDF</label>
+            <div class="export-title"><?= $page === 'remises' ? 'Exporter le tableau principal :' : 'Exporter les résultats filtrés :' ?></div>
+            <div class="export-links">
+                <?php foreach (['xls' => 'Excel (XLS)', 'csv' => 'CSV', 'pdf' => 'PDF'] as $format => $label): ?>
+                    <a class="export-link" href="export.php?<?= htmlspecialchars(http_build_query(array_merge($filters, ['page' => $reportPage, 'format' => $format])), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label) ?></a>
+                <?php endforeach; ?>
             </div>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
         </div>
+        <?php if ($page === 'remises'): ?>
+        <div class="dark-card export-bar" style="margin-top: 10px;">
+            <div class="export-title">Exporter les détails des remises filtrées :</div>
+            <div class="export-links">
+                <?php foreach (['xls' => 'Excel (XLS)', 'csv' => 'CSV', 'pdf' => 'PDF'] as $format => $label): ?>
+                    <a class="export-link" href="export.php?<?= htmlspecialchars(http_build_query(array_merge($filters, ['page' => 'remises', 'detail' => '1', 'format' => $format])), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label) ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
 
     </main>
 </body>
