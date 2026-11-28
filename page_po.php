@@ -14,18 +14,11 @@ require 'connection.php';
 require 'report_data.php';
 
 $page = $_GET['page'] ?? 'tresorerie';
-if (!in_array($page, ['tresorerie', 'remises', 'impayes', 'impayes_graph', 'comptes'], true)) {
+if (!in_array($page, ['tresorerie', 'remises', 'impayes', 'impayes_graph'], true)) {
     $page = 'tresorerie';
 }
 
-$user_id = $_SESSION['user']['id'];
-$user_profil = $_SESSION['user']['profil'];
-$user_id_client = $_SESSION['user']['id_client'];
-
 $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
-
-$success_msg = "";
-$error_msg = "";
 
 $reportPage = $page === 'impayes_graph' ? 'impayes' : $page;
 $filters = $_GET;
@@ -67,29 +60,6 @@ if ($page === 'impayes_graph') {
     $impayesGraph = fetchImpayesGraphData($pdo, $filters);
 }
 
-if ($page === 'comptes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $prenom = trim($_POST['prenom'] ?? '');
-    $nom    = trim($_POST['nom'] ?? '');
-    $login  = trim($_POST['login'] ?? '');
-    $mdp1   = $_POST['mdp1'] ?? '';
-    $mdp2   = $_POST['mdp2'] ?? '';
-    $profil = 'product_owner';
-
-    if ($mdp1 !== $mdp2) {
-        $error_msg = "Les mots de passe ne correspondent pas.";
-    } elseif (!empty($prenom) && !empty($nom) && !empty($login) && !empty($mdp1)) {
-        try {
-            $hash = password_hash($mdp1, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO utilisateur (login, mdp, nom, prenom, profil, id_client) VALUES (?, ?, ?, ?, ?, NULL)");
-            $stmt->execute([$login, $hash, $nom, $prenom, $profil]);
-            $success_msg = "Le compte Product Owner a été créé avec succès.";
-        } catch (PDOException $e) {
-            $error_msg = "Erreur lors de la création (ce login existe peut-être déjà).";
-        }
-    } else {
-        $error_msg = "Veuillez remplir tous les champs.";
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -109,7 +79,7 @@ if ($page === 'comptes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         .nav-menu { display: flex; flex-direction: column; gap: 25px; width: 100%; align-items: center; flex-grow: 1; }
         .nav-item { display: flex; flex-direction: column; align-items: center; color: #888; font-size: 11px; text-decoration: none; width: 80%; padding: 10px 0; border-radius: 12px; }
         .nav-item.active { background-color: #2a3441; color: #8fa0b5; }
-        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
         .logout-btn, .back-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column;}
@@ -204,16 +174,13 @@ if ($page === 'comptes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <nav class="nav-menu">
             <a href="?page=tresorerie" class="nav-item <?= $page === 'tresorerie' ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Trésorerie
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M7.5 9.5h.01M16.5 14.5h.01"></path></svg>Trésorerie
             </a>
             <a href="?page=remises" class="nav-item <?= $page === 'remises' ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M11 8v6l4-2"/></svg>Remises
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>Remises
             </a>
             <a href="?page=impayes" class="nav-item <?= in_array($page, ['impayes', 'impayes_graph']) ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><line x1="12" y1="15" x2="15" y2="18"/></svg>Impayés
-            </a>
-            <a href="?page=comptes" class="nav-item <?= $page === 'comptes' ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Comptes
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 16H3z"></path><path d="M12 9v4"></path><path d="M12 16h.01"></path></svg>Impayés
             </a>
         </nav>
 
@@ -325,7 +292,7 @@ if ($page === 'comptes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     <tbody>
                         <?php foreach ($remises as $row): ?>
                         <tr class="main-row" onclick="this.nextElementSibling.querySelector('.expanded-content').style.display = this.nextElementSibling.querySelector('.expanded-content').style.display === 'block' ? 'none' : 'block'">
-                            <td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="6 9 12 15 18 9"></polyline></svg> <?= htmlspecialchars($row['num_siren']) ?></td>
+                            <td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> <?= htmlspecialchars($row['num_siren']) ?></td>
                             <td style="font-family: inherit;"><?= htmlspecialchars($row['raison_sociale']) ?></td>
                             <td><?= htmlspecialchars($row['num_remise']) ?></td>
                             <td><?= htmlspecialchars($row['date_traitement']) ?></td>
@@ -470,66 +437,6 @@ if ($page === 'comptes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php elseif ($page === 'impayes_graph'): ?>
             <?php include 'impayes_graph_view.php'; ?>
 
-        <?php elseif ($page === 'comptes'): ?>
-            <h1>Gestion des comptes</h1>
-            
-            <?php if ($success_msg): ?>
-                <div class="alert-success"><?= htmlspecialchars($success_msg) ?></div>
-            <?php endif; ?>
-            <?php if ($error_msg): ?>
-                <div class="alert-error"><?= htmlspecialchars($error_msg) ?></div>
-            <?php endif; ?>
-
-            <div class="form-card">
-                <div class="form-header">
-                    <h2>Nouveau compte Product Owner</h2>
-                    <p>Remplissez les informations ci-dessous pour configurer un accès restreint aux fonctionnalités d'administration.</p>
-                </div>
-
-                <form method="POST" action="?page=comptes">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Prénom</label>
-                            <input type="text" name="prenom" required placeholder="Ex: Jean">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Nom</label>
-                            <input type="text" name="nom" required placeholder="Ex: DUPONT">
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Adresse email professionnelle</label>
-                            <input type="email" name="login" required placeholder="jean.dupont@entreprise.fr">
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Rôle / Type de compte</label>
-                            <select disabled>
-                                <option>PRODUCT OWNER</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Mot de passe</label>
-                            <input type="password" name="mdp1" required placeholder="********">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Confirmer le mot de passe</label>
-                            <input type="password" name="mdp2" required placeholder="********">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; justify-content: flex-end; align-items: center; gap: 20px;">
-                        <span style="color: #64748b; font-size: 12px;">Tous les champs sont requis.</span>
-                        <button type="submit" class="submit-btn">
-                            Créer le compte 
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                        </button>
-                    </div>
-                </form>
-            </div>
         <?php endif; ?>
 
         <?php if (in_array($page, ['tresorerie', 'remises', 'impayes'], true)): ?>

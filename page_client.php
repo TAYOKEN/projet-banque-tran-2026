@@ -80,7 +80,7 @@ if ($page === 'impayes_graph') {
         .nav-menu { display: flex; flex-direction: column; gap: 25px; width: 100%; align-items: center; flex-grow: 1; }
         .nav-item { display: flex; flex-direction: column; align-items: center; color: #888; font-size: 11px; text-decoration: none; width: 80%; padding: 10px 0; border-radius: 12px; }
         .nav-item.active { background-color: #242b3b; color: #8fa0b5; }
-        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
         .back-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; }
@@ -164,13 +164,13 @@ if ($page === 'impayes_graph') {
 
         <nav class="nav-menu">
             <a href="?page=tresorerie" class="nav-item <?= $page === 'tresorerie' ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Trésorerie
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M7.5 9.5h.01M16.5 14.5h.01"></path></svg>Trésorerie
             </a>
             <a href="?page=remises" class="nav-item <?= $page === 'remises' ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M11 8v6l4-2"/></svg>Remises
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>Remises
             </a>
             <a href="?page=impayes" class="nav-item <?= in_array($page, ['impayes', 'impayes_graph']) ? 'active' : '' ?>">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><line x1="12" y1="15" x2="15" y2="18"/></svg>Impayés
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 16H3z"></path><path d="M12 9v4"></path><path d="M12 16h.01"></path></svg>Impayés
             </a>
         </nav>
 
@@ -266,7 +266,7 @@ if ($page === 'impayes_graph') {
                     <tbody>
                         <?php foreach ($remises as $row): ?>
                         <tr class="main-row" onclick="this.nextElementSibling.querySelector('.expanded-content').style.display = this.nextElementSibling.querySelector('.expanded-content').style.display === 'block' ? 'none' : 'block'">
-                            <td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="6 9 12 15 18 9"></polyline></svg> <?= htmlspecialchars($row['num_siren']) ?></td>
+                            <td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> <?= htmlspecialchars($row['num_siren']) ?></td>
                             <td style="font-family: inherit;"><?= htmlspecialchars($row['raison_sociale']) ?></td>
                             <td><?= htmlspecialchars($row['num_remise']) ?></td>
                             <td><?= htmlspecialchars($row['date_traitement']) ?></td>

@@ -5,6 +5,7 @@ if (!in_array($chartType, ['bar', 'line'], true)) {
 }
 $months = $impayesGraph['months'];
 $motifs = $impayesGraph['motifs'];
+$rangeMode = $impayesGraph['range_mode'];
 $chartMaximum = 0.0;
 $totalTurnover = 0.0;
 $totalUnpaid = 0.0;
@@ -66,6 +67,8 @@ foreach ($months as $index => $month) {
     .motif-swatch { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
     .print-button { border: 0; border-radius: 8px; padding: 10px 16px; background: #334155; color: #fff; font-weight: 600; cursor: pointer; }
     .chart-empty { color: #64748b; text-align: center; padding: 28px; }
+    .range-mode-note { color: #cbd5e1; font-size: 12px; }
+    .range-mode-error { color: #991b1b; background: #fee2e2; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
     @media print {
         .sidebar, .graph-filters, .print-control { display: none !important; }
         body { display: block; height: auto; overflow: visible; background: #fff; }
@@ -76,24 +79,34 @@ foreach ($months as $index => $month) {
 </style>
 
 <h1>Statistiques des impayés</h1>
+<?php if ($impayesGraph['range_error'] !== ''): ?>
+    <div class="range-mode-error" role="alert"><?= htmlspecialchars($impayesGraph['range_error']) ?></div>
+<?php endif; ?>
 <form method="get" class="top-section graph-filters">
     <input type="hidden" name="page" value="impayes_graph">
     <div class="dark-card filter-card">
         <div class="filter-controls">
             <div class="filter-field">
+                <label for="range_mode">Critère de période</label>
+                <select id="range_mode" name="range_mode" class="sort-select">
+                    <option value="rolling" <?= $rangeMode === 'rolling' ? 'selected' : '' ?>>Période glissante</option>
+                    <option value="custom" <?= $rangeMode === 'custom' ? 'selected' : '' ?>>Plage de dates</option>
+                </select>
+            </div>
+            <div class="filter-field">
                 <label for="periode">Période glissante</label>
-                <select id="periode" name="periode" class="sort-select">
+                <select id="periode" name="periode" class="sort-select" <?= $rangeMode === 'custom' ? 'disabled' : '' ?>>
                     <option value="4" <?= (string) $impayesGraph['periode'] === '4' ? 'selected' : '' ?>>4 mois</option>
                     <option value="12" <?= (string) $impayesGraph['periode'] === '12' ? 'selected' : '' ?>>12 mois</option>
                 </select>
             </div>
-            <div class="filter-field">
+            <div class="filter-field range-date-field">
                 <label for="date_debut">Ou du</label>
-                <input id="date_debut" type="date" name="date_debut" class="form-input" value="<?= htmlspecialchars(reportInput($filters, 'date_debut')) ?>">
+                <input id="date_debut" type="date" name="date_debut" class="form-input" value="<?= htmlspecialchars(reportInput($filters, 'date_debut')) ?>" <?= $rangeMode === 'custom' ? 'required' : 'disabled' ?>>
             </div>
-            <div class="filter-field">
+            <div class="filter-field range-date-field">
                 <label for="date_fin">Au</label>
-                <input id="date_fin" type="date" name="date_fin" class="form-input" value="<?= htmlspecialchars(reportInput($filters, 'date_fin')) ?>">
+                <input id="date_fin" type="date" name="date_fin" class="form-input" value="<?= htmlspecialchars(reportInput($filters, 'date_fin')) ?>" <?= $rangeMode === 'custom' ? 'required' : 'disabled' ?>>
             </div>
             <div class="filter-field">
                 <label for="chart_type">Type de graphique</label>
@@ -106,7 +119,29 @@ foreach ($months as $index => $month) {
     </div>
     <button type="submit" class="filter-submit">Actualiser</button>
     <a href="?page=impayes" class="btn-purple">Retour au tableau</a>
+    <span class="range-mode-note">Choisissez une période glissante ou une plage de dates personnalisée.</span>
 </form>
+
+<script>
+    const rangeMode = document.getElementById('range_mode');
+    const rollingPeriod = document.getElementById('periode');
+    const rangeDates = [
+        document.getElementById('date_debut'),
+        document.getElementById('date_fin')
+    ];
+
+    function updateRangeControls() {
+        const customRange = rangeMode.value === 'custom';
+        rollingPeriod.disabled = customRange;
+        rangeDates.forEach((input) => {
+            input.disabled = !customRange;
+            input.required = customRange;
+        });
+    }
+
+    rangeMode.addEventListener('change', updateRangeControls);
+    updateRangeControls();
+</script>
 
 <div class="dark-card results-section">
     <div class="results-header">

@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'qu-dev-1-2';
+$dbname = 'bdd-qudev';
 $username = 'root';
 $password = 'root'; // Mettez votre mot de passe local si nécessaire (ex: '' ou 'root')
 

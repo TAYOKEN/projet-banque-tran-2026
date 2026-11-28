@@ -13,8 +13,6 @@ if ($_SESSION['user']['profil'] !== 'admin') {
 require 'connection.php';
 
 $user_id = $_SESSION['user']['id'];
-$user_profil = $_SESSION['user']['profil'];
-$user_id_client = $_SESSION['user']['id_client'];
 
 $nom_utilisateur = htmlspecialchars($_SESSION['user']['prenom'] . " " . $_SESSION['user']['nom']);
 $stmt_clients = $pdo->query("SELECT id_client, raison_sociale, siren FROM client ORDER BY raison_sociale ASC");
@@ -35,10 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($targetId === false || $targetId === (int) $user_id) {
             $error_msg = "Ce compte ne peut pas être supprimé.";
         } else {
-            $stmt = $pdo->prepare('DELETE FROM utilisateur WHERE id_utilisateur = ?');
+            $stmt = $pdo->prepare("DELETE FROM utilisateur WHERE id_utilisateur = ? AND profil = 'client'");
             $stmt->execute([$targetId]);
             if ($stmt->rowCount() === 0) {
-                $error_msg = "Le compte demandé n'existe plus.";
+                $error_msg = "Le compte client demandé n'existe pas ou ne peut pas être supprimé.";
             } else {
                 $success_msg = "Le compte a été supprimé.";
             }
@@ -54,23 +52,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (($_POST['accord_po'] ?? '') !== '1') {
             $error_msg = "L'accord du Product Owner est obligatoire pour créer un compte.";
-        } elseif (!in_array($profil, ['admin', 'product_owner', 'client'], true)) {
-            $error_msg = "Le type de compte sélectionné est invalide.";
-        } elseif ($profil === 'client' && ($id_client === false || $id_client === null)) {
+        } elseif ($profil !== 'client') {
+            $error_msg = "L'administrateur ne peut créer que des comptes Client.";
+        } elseif ($id_client === false || $id_client === null) {
             $error_msg = "Veuillez sélectionner une entreprise pour ce compte Client.";
         } elseif ($mdp1 !== $mdp2) {
             $error_msg = "Les mots de passe ne correspondent pas.";
         } elseif ($prenom === '' || $nom === '' || $login === '' || $mdp1 === '') {
             $error_msg = "Veuillez remplir tous les champs obligatoires.";
         } else {
-            if ($profil !== 'client') {
-                $id_client = null;
-            } else {
-                $clientCheck = $pdo->prepare('SELECT COUNT(*) FROM client WHERE id_client = ?');
-                $clientCheck->execute([$id_client]);
-                if ((int) $clientCheck->fetchColumn() === 0) {
-                    $error_msg = "L'entreprise sélectionnée n'existe pas.";
-                }
+            $clientCheck = $pdo->prepare('SELECT COUNT(*) FROM client WHERE id_client = ?');
+            $clientCheck->execute([$id_client]);
+            if ((int) $clientCheck->fetchColumn() === 0) {
+                $error_msg = "L'entreprise sélectionnée n'existe pas.";
             }
 
             if ($error_msg === '') {
@@ -87,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-$stmt_users = $pdo->query('SELECT id_utilisateur, login, nom, prenom, profil FROM utilisateur ORDER BY id_utilisateur ASC');
+$stmt_users = $pdo->query("SELECT id_utilisateur, login, nom, prenom, profil FROM utilisateur WHERE profil = 'client' ORDER BY id_utilisateur ASC");
 $users_list = $stmt_users->fetchAll();
 ?>
 
@@ -108,7 +102,7 @@ $users_list = $stmt_users->fetchAll();
         .nav-menu { display: flex; flex-direction: column; gap: 25px; width: 100%; align-items: center; flex-grow: 1; }
         .nav-item { display: flex; flex-direction: column; align-items: center; color: #888; font-size: 11px; text-decoration: none; width: 80%; padding: 10px 0; border-radius: 12px; opacity: 0.5; cursor: default; }
         .nav-item.active { background-color: #2a3441; color: #8fa0b5; opacity: 1; cursor: pointer; }
-        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: currentColor; }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 5px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
         .logout-btn { width: 50px; height: 50px; border-radius: 50%; background-color: #ef4444; display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; margin-top: auto; }
 
         .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column;}
@@ -142,7 +136,6 @@ $users_list = $stmt_users->fetchAll();
         .approval-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #475569; white-space: nowrap; }
         .delete-btn { border: 0; border-radius: 7px; background: #dc2626; color: #fff; padding: 8px 10px; cursor: pointer; }
         
-        #bloc_entreprise { display: none; }
     </style>
 </head>
 <body>
@@ -157,16 +150,16 @@ $users_list = $stmt_users->fetchAll();
 
         <nav class="nav-menu">
             <div class="nav-item">
-                <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Trésorerie
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M7.5 9.5h.01M16.5 14.5h.01"></path></svg>Trésorerie
             </div>
             <div class="nav-item">
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M11 8v6l4-2"/></svg>Remises
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>Remises
             </div>
             <div class="nav-item">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><line x1="12" y1="15" x2="15" y2="18"/></svg>Impayés
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 16H3z"></path><path d="M12 9v4"></path><path d="M12 16h.01"></path></svg>Impayés
             </div>
             <a href="#" class="nav-item active">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Comptes
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-1a6 6 0 0 1 12 0v1"></path><path d="M16 11a4 4 0 1 0-1.4-7.7"></path><path d="M17 14a5 5 0 0 1 4 5v1"></path></svg>Comptes
             </a>
         </nav>
 
@@ -187,13 +180,14 @@ $users_list = $stmt_users->fetchAll();
 
         <div class="form-card">
             <div class="form-header">
-                <h2>Nouveau compte utilisateur</h2>
-                <p>Création de comptes Administrateurs, Product Owners ou Clients</p>
+                <h2>Nouveau compte Client</h2>
+                <p>Création d’un compte client sur demande validée par le Product Owner.</p>
             </div>
 
             <form method="POST" action="">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="action" value="create">
+                <input type="hidden" name="profil" value="client">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Prénom</label>
@@ -211,17 +205,8 @@ $users_list = $stmt_users->fetchAll();
                     </div>
 
                     <div class="form-group full-width">
-                        <label>Rôle / Type de compte</label>
-                        <select name="profil" id="select_profil" class="form-select" onchange="toggleEntrepriseField()">
-                            <option value="admin">ADMINISTRATEUR</option>
-                            <option value="product_owner">PRODUCT OWNER</option>
-                            <option value="client" selected>CLIENT</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group full-width" id="bloc_entreprise">
-                        <label>Lier à l'entreprise (Obligatoire pour les clients)</label>
-                        <select name="id_client" class="form-select">
+                        <label for="id_client">Entreprise du compte Client</label>
+                        <select id="id_client" name="id_client" class="form-select" required>
                             <option value="">-- Sélectionnez une entreprise --</option>
                             <?php foreach ($clients_list as $cli): ?>
                                 <option value="<?= $cli['id_client'] ?>">
@@ -258,7 +243,7 @@ $users_list = $stmt_users->fetchAll();
         </div>
 
         <section class="accounts-card">
-            <h2>Comptes utilisateurs existants</h2>
+            <h2>Comptes Clients existants</h2>
             <div class="accounts-table-wrap">
                 <table class="accounts-table">
                     <thead><tr><th>Utilisateur</th><th>Nom</th><th>Rôle</th><th>Action</th></tr></thead>
@@ -269,17 +254,13 @@ $users_list = $stmt_users->fetchAll();
                                 <td><?= htmlspecialchars($account['prenom'] . ' ' . $account['nom']) ?></td>
                                 <td><?= htmlspecialchars(strtoupper(str_replace('_', ' ', $account['profil']))) ?></td>
                                 <td>
-                                    <?php if ((int) $account['id_utilisateur'] === (int) $user_id): ?>
-                                        Compte connecté
-                                    <?php else: ?>
-                                        <form method="POST" class="delete-form" onsubmit="return confirm('Confirmer la suppression de ce compte ?');">
-                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="user_id" value="<?= (int) $account['id_utilisateur'] ?>">
-                                            <label class="approval-check"><input type="checkbox" name="accord_po" value="1" required> Accord PO</label>
-                                            <button type="submit" class="delete-btn">Supprimer</button>
-                                        </form>
-                                    <?php endif; ?>
+                                    <form method="POST" class="delete-form" onsubmit="return confirm('Confirmer la suppression de ce compte client ?');">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="user_id" value="<?= (int) $account['id_utilisateur'] ?>">
+                                        <label class="approval-check"><input type="checkbox" name="accord_po" value="1" required> Accord PO</label>
+                                        <button type="submit" class="delete-btn">Supprimer</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -288,21 +269,6 @@ $users_list = $stmt_users->fetchAll();
             </div>
         </section>
 
-        <script>
-            function toggleEntrepriseField() {
-                const profil = document.getElementById('select_profil').value;
-                const blocEntreprise = document.getElementById('bloc_entreprise');
-                
-                if (profil === 'client') {
-                    blocEntreprise.style.display = 'block';
-                    blocEntreprise.querySelector('select').setAttribute('required', 'required');
-                } else {
-                    blocEntreprise.style.display = 'none';
-                    blocEntreprise.querySelector('select').removeAttribute('required');
-                }
-            }
-            toggleEntrepriseField();
-        </script>
     </main>
 </body>
 </html>

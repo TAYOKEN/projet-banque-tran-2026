@@ -305,9 +305,29 @@ function fetchImpayesGraphData(PDO $pdo, array $filters, ?int $clientId = null):
     $end = reportInput($filters, 'date_fin');
     $validStart = $start !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) && checkdate((int) substr($start, 5, 2), (int) substr($start, 8, 2), (int) substr($start, 0, 4));
     $validEnd = $end !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $end) && checkdate((int) substr($end, 5, 2), (int) substr($end, 8, 2), (int) substr($end, 0, 4));
-    $startDate = $validStart ? new DateTimeImmutable($start) : $defaultStart;
-    $endDate = $validEnd ? (new DateTimeImmutable($end))->modify('+1 day') : $defaultEnd;
-    if ($startDate >= $endDate) {
+    $requestedMode = reportInput($filters, 'range_mode');
+    $rangeMode = in_array($requestedMode, ['rolling', 'custom'], true)
+        ? $requestedMode
+        : (($start !== '' || $end !== '') ? 'custom' : 'rolling');
+    $rangeError = '';
+
+    if ($rangeMode === 'custom') {
+        if (!$validStart || !$validEnd) {
+            $rangeError = 'Saisissez des dates de début et de fin valides. La période glissante est affichée.';
+            $rangeMode = 'rolling';
+            $startDate = $defaultStart;
+            $endDate = $defaultEnd;
+        } else {
+            $startDate = new DateTimeImmutable($start);
+            $endDate = (new DateTimeImmutable($end))->modify('+1 day');
+            if ($startDate >= $endDate) {
+                $rangeError = 'La date de début doit être antérieure ou égale à la date de fin. La période glissante est affichée.';
+                $rangeMode = 'rolling';
+                $startDate = $defaultStart;
+                $endDate = $defaultEnd;
+            }
+        }
+    } else {
         $startDate = $defaultStart;
         $endDate = $defaultEnd;
     }
@@ -354,6 +374,8 @@ function fetchImpayesGraphData(PDO $pdo, array $filters, ?int $clientId = null):
         'date_debut' => $startDate->format('Y-m-d'),
         'date_fin' => $endDate->modify('-1 day')->format('Y-m-d'),
         'periode' => $period,
+        'range_mode' => $rangeMode,
+        'range_error' => $rangeError,
     ];
 }
 
